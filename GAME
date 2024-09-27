@@ -1,0 +1,191 @@
+import pygame
+import random
+import os
+
+# 初始化 pygame
+pygame.init()
+
+# 定義顯示窗口的尺寸
+SCREEN_WIDTH = 400
+SCREEN_HEIGHT = 600
+screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
+pygame.display.set_caption("Flappy Bird")
+
+# 定義顏色
+WHITE = (255, 255, 255)
+BLACK = (0, 0, 0)
+
+# 定義遊戲資源路徑（下載並保存以下圖片到assets文件夾中）
+ASSET_DIR = "assets/"
+BIRD_IMAGES = [
+    pygame.image.load(os.path.join(ASSET_DIR, "sketching-red-threatening-dragon-with-large-wings- (1).png")),
+    pygame.image.load(os.path.join(ASSET_DIR, "sketching-red-threatening-dragon-with-large-wings- (1).png")),
+    pygame.image.load(os.path.join(ASSET_DIR, "sketching-red-threatening-dragon-with-large-wings- (1).png"))
+]
+PIPE_IMAGE = pygame.image.load(os.path.join(ASSET_DIR, "下載.jfif"))
+BOSS_IMAGE = pygame.image.load(os.path.join(ASSET_DIR, "下載.png"))
+GAME_OVER_IMAGE = pygame.image.load(os.path.join(ASSET_DIR, "下載2.png"))
+BACKGROUND_IMAGE = pygame.image.load(os.path.join(ASSET_DIR, "下載3.png"))
+
+
+
+# 設置時鐘以控制幀速率
+clock = pygame.time.Clock()
+
+# 定義小鳥類
+class Bird:
+    def __init__(self):
+        self.images = BIRD_IMAGES
+        self.image_index = 0
+        self.x = 50
+        self.y = SCREEN_HEIGHT // 2
+        self.gravity = 0.6
+        self.lift = -12
+        self.velocity = 0
+        self.rect = self.images[0].get_rect()
+        self.rect.topleft = (self.x, self.y)
+    
+    def draw(self, screen):
+        screen.blit(self.images[self.image_index], (self.x, self.y))
+    
+    def update(self):
+        self.velocity += self.gravity
+        self.y += self.velocity
+        # 小鳥觸碰到地面則遊戲結束
+        if self.y > SCREEN_HEIGHT - self.images[0].get_height():
+            self.y = SCREEN_HEIGHT - self.images[0].get_height()
+            self.velocity = 0
+        
+        # 更新圖像索引以創建動畫效果
+        self.image_index = (self.image_index + 1) % len(self.images)
+        self.rect.topleft = (self.x, self.y)
+    
+    def flap(self):
+        self.velocity = self.lift
+
+# 定義柱子類
+class Pipe:
+    def __init__(self, xpos):
+        self.image = PIPE_IMAGE
+        self.x = xpos
+        self.y = random.randint(-150, 0)
+        self.rect_top = self.image.get_rect()
+        self.rect_bottom = self.image.get_rect()
+        self.rect_top.topleft = (self.x, self.y)
+        self.rect_bottom.topleft = (self.x, self.y + self.image.get_height() + 200)
+    
+    def draw(self, screen):
+        screen.blit(pygame.transform.flip(self.image, False, True), self.rect_top)
+        screen.blit(self.image, self.rect_bottom)
+    
+    def update(self):
+        self.x -= 5
+        if self.x < -self.image.get_width():
+            self.x = SCREEN_WIDTH
+            self.y = random.randint(-150, 0)
+        self.rect_top.topleft = (self.x, self.y)
+        self.rect_bottom.topleft = (self.x, self.y + self.image.get_height() + 200)
+
+# 定義BOSS類
+class Boss:
+    def __init__(self):
+        self.image = BOSS_IMAGE
+        self.x = SCREEN_WIDTH
+        self.y = random.randint(50, SCREEN_HEIGHT // 2)
+        self.velocity = 5
+        self.rect = self.image.get_rect()
+        self.rect.topleft = (self.x, self.y)
+    
+    def draw(self, screen):
+        screen.blit(self.image, (self.x, self.y))
+    
+    def update(self):
+        self.x -= self.velocity
+        if self.x < -self.image.get_width():
+            self.x = SCREEN_WIDTH
+            self.y = random.randint(50, SCREEN_HEIGHT // 2)
+        self.rect.topleft = (self.x, self.y)
+
+# 定義背景滾動類
+class Background:
+    def __init__(self):
+        self.image = BACKGROUND_IMAGE
+        self.x1 = 0
+        self.x2 = self.image.get_width()
+    
+    def draw(self, screen):
+        screen.blit(self.image, (self.x1, 0))
+        screen.blit(self.image, (self.x2, 0))
+    
+    def update(self):
+        self.x1 -= 2
+        self.x2 -= 2
+        if self.x1 < -self.image.get_width():
+            self.x1 = self.image.get_width()
+        if self.x2 < -self.image.get_width():
+            self.x2 = self.image.get_width()
+
+def main():
+    run = True
+    bird = Bird()
+    pipes = [Pipe(SCREEN_WIDTH + i * 200) for i in range(3)]
+    boss = Boss()
+    background = Background()
+    score = 0
+    level = 1
+    font = pygame.font.SysFont(None, 30)
+    
+    while run:
+        for event in pygame.event.get():
+            if event.type == pygame.QUIT:
+                run = False
+            if event.type == pygame.KEYDOWN:
+                if event.key == pygame.K_SPACE:
+                    bird.flap()
+        
+        # 更新遊戲元素
+        bird.update()
+        for pipe in pipes:
+            pipe.update()
+        background.update()
+
+        # 每隔一定分數生成BOSS
+        if score > 0 and score % 500 == 0:
+            boss.update()
+
+        # 碰撞檢測
+        for pipe in pipes:
+            if bird.rect.colliderect(pipe.rect_top) or bird.rect.colliderect(pipe.rect_bottom):
+                run = False
+        if bird.rect.colliderect(boss.rect):
+            run = False
+        
+        # 繪製遊戲元素
+        screen.fill(WHITE)
+        background.draw(screen)
+        bird.draw(screen)
+        for pipe in pipes:
+            pipe.draw(screen)
+
+        # 只有在特定條件下才顯示BOSS
+        if score > 0 and score % 500 == 0:
+            boss.draw(screen)
+        
+        # 更新分數
+        score += 1
+        score_text = font.render(f"Score: {score // 10}", True, BLACK)
+        screen.blit(score_text, (10, 10))
+        
+        pygame.display.update()
+        clock.tick(30)  # 控制遊戲幀速率
+    
+    game_over(screen)
+    pygame.quit()
+
+def game_over(screen):
+    screen.blit(GAME_OVER_IMAGE, (SCREEN_WIDTH // 2 - GAME_OVER_IMAGE.get_width() // 2, SCREEN_HEIGHT // 2 - GAME_OVER_IMAGE.get_height() // 2))
+    pygame.display.update()
+    pygame.time.wait(2000)
+
+if __name__ == "__main__":
+    main()
